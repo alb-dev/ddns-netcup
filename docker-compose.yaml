@@ -1,7 +1,7 @@
 ---
 services:
   ownDynDNS:
-    image: sujiba/docker-owndyndns-netcup:latest
+    image: ghcr.io/naoalb/docker-owndyndns-netcup:latest
     container_name: ownDynDNS
     # Run container behind reverse proxy
     ports:
