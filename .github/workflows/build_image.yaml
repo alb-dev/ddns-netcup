@@ -5,13 +5,52 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  schedule:
+    - cron: '0 */6 * * *'  # Check every 6 hours
 
 env:
   IMAGE_NAME: ${{ github.repository }}
   REGISTRY: ghcr.io
+  DEPENDENCY_REPO: "fernwerker/ownDynDNS"
 
 jobs:
+  check_dependency:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.changed }}
+    steps:
+      - name: Check for updates in ownDynDNS
+        id: check
+        run: |
+          # Get the latest commit hash from fernwerker/ownDynDNS
+          LATEST=$(curl -s "https://api.github.com/repos/${{ env.DEPENDENCY_REPO }}/commits/main" | jq -r .sha)
+          
+          # Create a file to store the hash if it doesn't exist
+          mkdir -p .github/dependency-tracking
+          HASH_FILE=.github/dependency-tracking/owndyndns-hash
+          
+          # Get the previous hash if it exists
+          if [ -f "$HASH_FILE" ]; then
+            PREVIOUS=$(cat $HASH_FILE)
+          else
+            PREVIOUS=""
+          fi
+          
+          if [ "$LATEST" != "$PREVIOUS" ]; then
+            echo "Dependency updated. Previous: $PREVIOUS, Latest: $LATEST"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo $LATEST > $HASH_FILE
+          else
+            echo "No updates to dependency"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: check_dependency
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      needs.check_dependency.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -87,4 +126,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           generate_release_notes: true
+          body: |
+            This release was triggered by:
+            ${{ github.event_name == 'schedule' && needs.check_dependency.outputs.should_build == 'true' && '- Update in fernwerker/ownDynDNS repository' || '- Direct push to this repository' }}
           token: ${{ secrets.GITHUB_TOKEN }}
