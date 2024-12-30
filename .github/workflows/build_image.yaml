@@ -3,8 +3,6 @@ name: Docker Build and Push
 on:
   push:
     branches: [ "main" ]
-  schedule:
-    - cron: '0 */6 * * *'  # Check every 6 hours
 
 env:
   IMAGE_NAME: ${{ github.repository }}
